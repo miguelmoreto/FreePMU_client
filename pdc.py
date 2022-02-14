@@ -6,7 +6,7 @@ from PyQt5 import QtWidgets, uic
 from pyqtgraph import PlotWidget
 import pyqtgraph as pg
 
-from PySide2 import QtCore
+from PySide6 import QtCore
 from PyQt5.QtCore import QDate, QTime, QDateTime, Qt
 
 from ctypes import cdll, c_long, c_int, c_char_p, create_string_buffer
@@ -257,7 +257,17 @@ class MainWindow(QMainWindow):
                     port = int(self.host_port.text())
                     addr = (host, port)
                     self.tcpCliSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    self.tcpCliSock.connect((host,port))
+                    self.tcpCliSock.settimeout(5)
+                    # Timeout checking:
+                    try:
+                        self.tcpCliSock.connect((host,port))
+                    except socket.timeout:
+                        self.statusBar().showMessage('Socket timeout!',5000)
+                        self.pushButton_connect.setText('Connect')
+                        print('Socket timeout')
+                        self.connected = 0
+                        return
+
                     buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
                     self.tcpCliSock.send(buffer)
                     buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05'
