@@ -6,7 +6,8 @@ from PyQt5 import QtWidgets, uic
 from pyqtgraph import PlotWidget
 import pyqtgraph as pg
 
-from PySide6 import QtCore
+#from PySide6 import QtCore
+from PyQt5 import QtCore
 from PyQt5.QtCore import QDate, QTime, QDateTime, Qt
 
 from ctypes import cdll, c_long, c_int, c_char_p, create_string_buffer
@@ -129,13 +130,13 @@ class MainWindow(QMainWindow):
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_mag0[i] = fp.contents.value         # dereference the pointer, get the float
-                                #print(self.phasors_mag0[i])
+                                print('Mag'+ repr(self.phasors_mag0[i]))
 
                                 phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_phase0[i] = (fp.contents.value * 180.0) / math.pi        # dereference the pointer, get the float
-                                #print(self.phasors_phase0[i])
+                                print('Ang' + repr(self.phasors_phase0[i]))
                             elif j == 1:
                                 phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
@@ -242,6 +243,7 @@ class MainWindow(QMainWindow):
 
     def on_comboBox_clicked(self):
         index = self.comboBox.currentIndex()
+        print(index)
         self.label_phasors.setText(str(self.num_phasors[index]))
         self.label_analogs.setText(str(self.num_analogs[index]))
         self.label_digitals.setText(str(self.num_analogs[index]))
@@ -253,7 +255,7 @@ class MainWindow(QMainWindow):
                 #print("button_clicked connected")
                 if self.connected == 0:
                     self.pushButton_connect.setText('Disconnect')
-                    host = self.host_ip.text()
+                    host = str(self.host_ip.text())
                     port = int(self.host_port.text())
                     addr = (host, port)
                     self.tcpCliSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -346,6 +348,8 @@ class MainWindow(QMainWindow):
             else:
                 #print("button_clicked disconnected")
                 self.connected = 0
+                buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+                self.tcpCliSock.send(buffer)
                 self.timer1.stop()
                 self.tcpCliSock.close()
                 self.counter = 0
