@@ -92,10 +92,10 @@ class MainWindow(QMainWindow):
         self.graph_freq.setBackground('w')
         self.graph_freq.setXRange(0.0, 10.0, padding=0)
 
-        self.graph_phase.setLabel('left', "<span style=\"color:blue;font-size:12px\">Phase (Degrees)</span>")
+        self.graph_phase.setLabel('left', "<span style=\"color:blue;font-size:12px\">Magnitude (V)</span>")
         self.graph_phase.setLabel('bottom', "<span style=\"color:blue;font-size:12px\">Time (s)</span>")
         self.graph_phase.setBackground('w')
-        self.graph_phase.setYRange(-180.0, 180.0, padding=0)
+        self.graph_phase.setYRange(200.0, 230.0, padding=0)
         self.graph_phase.setXRange(0.0, 10.0, padding=0)
 
     def showTime(self):
@@ -130,50 +130,56 @@ class MainWindow(QMainWindow):
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_mag0[i] = fp.contents.value         # dereference the pointer, get the float
-                                print('Mag'+ repr(self.phasors_mag0[i]))
+                                #print('Mag0_'+repr(i)+':'+repr(self.phasors_mag0[i]))
 
                                 phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_phase0[i] = (fp.contents.value * 180.0) / math.pi        # dereference the pointer, get the float
-                                print('Ang' + repr(self.phasors_phase0[i]))
+                                #print('Ang0_'+repr(i)+':'+ repr(self.phasors_phase0[i]))
                             elif j == 1:
                                 phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_mag1[i] = fp.contents.value         # dereference the pointer, get the float
                                 #print(self.phasors_mag1[i])
+                                #print('Mag1_'+repr(i)+':'+ repr(self.phasors_mag1[i]))
 
                                 phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_phase1[i] = (fp.contents.value * 180.0) / math.pi        # dereference the pointer, get the float
                                 #print(self.phasors_phase1[i])
+                                #print('Ang1_'+repr(i)+':'+ repr(self.phasors_phase1[i]))
                             elif j == 2:
                                 phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_mag2[i] = fp.contents.value         # dereference the pointer, get the float
                                 #print(self.phasors_mag2[i])
+                                #print('Mag2_'+repr(i)+':'+ repr(self.phasors_mag2[i]))
 
                                 phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_phase2[i] = (fp.contents.value * 180.0) / math.pi        # dereference the pointer, get the float
                                 #print(self.phasors_phase2[i])
+                                #print('Ang2_'+repr(i)+':'+ repr(self.phasors_phase2[i]))
                             elif j == 3:
                                 phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_mag3[i] = fp.contents.value         # dereference the pointer, get the float
                                 #print(self.phasors_mag3[i])
+                                #print('Mag3_'+repr(i)+':'+ repr(self.phasors_mag3[i]))
 
                                 phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
                                 cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                                 fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                                 self.phasors_phase3[i] = (fp.contents.value * 180.0) / math.pi        # dereference the pointer, get the float
                                 #print(self.phasors_phase3[i])
-                            k += 4
+                                #print('Ang3_'+repr(i)+':'+ repr(self.phasors_phase3[i]))
+                            k += 8
 
 
                     # Selecionar pelo combo
@@ -195,13 +201,13 @@ class MainWindow(QMainWindow):
                             self.graph_data_y0.append(self.freq)  # Add a new random value.
 
                             self.graph_data_y1 = self.graph_data_y1[1:]  # Remove the first
-                            self.graph_data_y1.append(self.phasors_phase0[0])  # Add a new random value.
+                            self.graph_data_y1.append(self.mag0[0])  # Add a new random value.
 
                             self.graph_data_y2 = self.graph_data_y2[1:]  # Remove the first
-                            self.graph_data_y2.append(self.phasors_phase0[1])  # Add a new random value.
+                            self.graph_data_y2.append(self.mag0[1])  # Add a new random value.
 
                             self.graph_data_y3 = self.graph_data_y3[1:]  # Remove the first
-                            self.graph_data_y3.append(self.phasors_phase0[2])  # Add a new random value.
+                            self.graph_data_y3.append(self.mag0[2])  # Add a new random value.
 
                             #self.graph_data_x.insert(self.counter, self.idx)
                             #self.graph_data_y0.insert(self.counter, self.freq)
@@ -212,9 +218,9 @@ class MainWindow(QMainWindow):
                     else:                        
                             self.graph_data_x.insert(self.counter, self.idx)
                             self.graph_data_y0.insert(self.counter, self.freq)
-                            self.graph_data_y1.insert(self.counter, self.phasors_phase0[0])
-                            self.graph_data_y2.insert(self.counter, self.phasors_phase0[1])
-                            self.graph_data_y3.insert(self.counter, self.phasors_phase0[2])
+                            self.graph_data_y1.insert(self.counter, self.phasors_mag0[0])
+                            self.graph_data_y2.insert(self.counter, self.phasors_mag0[1])
+                            self.graph_data_y3.insert(self.counter, self.phasors_mag0[2])
                             pen0 = pg.mkPen(color=(255, 0, 0))
                             pen1 = pg.mkPen(color=(0, 255, 0))
                             pen2 = pg.mkPen(color=(0, 0, 255))
@@ -244,9 +250,12 @@ class MainWindow(QMainWindow):
     def on_comboBox_clicked(self):
         index = self.comboBox.currentIndex()
         print(index)
+        if index < 0:
+            return
+
         self.label_phasors.setText(str(self.num_phasors[index]))
         self.label_analogs.setText(str(self.num_analogs[index]))
-        self.label_digitals.setText(str(self.num_analogs[index]))
+        self.label_digitals.setText(str(self.num_digitals[index]))
 
     def on_pushButton_connect_clicked(self):
         self.pressed += 1
@@ -286,22 +295,22 @@ class MainWindow(QMainWindow):
                         self.graph_freq.setYRange(self.nominal_freq-2.0, self.nominal_freq+2.0, padding=0)
                         self.label_nfreq.setText(str(self.nominal_freq))
 
-                        #self.station_name = []
-                        #self.num_phasors = []
-                        #self.num_analogs = []
-                        #self.num_digitals = []
+                        self.station_name = []
+                        self.num_phasors = []
+                        self.num_analogs = []
+                        self.num_digitals = []
                         offset = 0
-                        #self.offsets = []
+                        self.offsets = []
                         self.offsets.append(16)
                         for i in range(0, self.num_pmu):
                             self.station_name.append(str(read_buffer[(20+offset):(36+offset)], 'UTF-8'))
-                            self.comboBox.addItem(self.station_name[i])
                             self.num_phasors.append((read_buffer[40+offset] << 8) + read_buffer[41+offset])
                             self.num_analogs.append((read_buffer[42+offset] << 8) + read_buffer[43+offset])
                             self.num_digitals.append((read_buffer[44+offset] << 8) + read_buffer[45+offset])
                             offset = offset + 30 + self.num_phasors[i]*16 + self.num_phasors[i]*4
                             self.offsets.append(10+self.num_phasors[i]*8+self.offsets[i])
                             #print(self.offsets[i])
+                            self.comboBox.addItem(self.station_name[i])
 
                         for j in range(0, self.num_pmu):
                             for i in range(0, self.num_phasors[j]):
@@ -326,6 +335,10 @@ class MainWindow(QMainWindow):
                                     self.phasor_name3.append(str(read_buffer[(436+self.num_phasors[j-1]*16+16*i):(452+self.num_phasors[j-1]*16+16*i)], 'UTF-8'))
                                     #print(self.phasor_name3[i])
                         
+                        print('Num Phasors list: ' + repr(self.num_phasors))
+                        print('Num Analogs list: ' + repr(self.num_analogs))
+                        print('Num Digitals list: ' + repr(self.num_digitals))
+                        print('Offsets: '+ repr(self.offsets))
                         self.comboBox.setCurrentIndex(0)
                         self.label_phasors.setText(str(self.num_phasors[0]))
                         self.label_analogs.setText(str(self.num_analogs[0]))
