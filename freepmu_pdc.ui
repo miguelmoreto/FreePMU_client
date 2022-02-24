@@ -204,7 +204,7 @@
          </size>
         </property>
         <property name="currentIndex">
-         <number>0</number>
+         <number>1</number>
         </property>
         <widget class="QWidget" name="tabConfig">
          <attribute name="title">
@@ -802,10 +802,18 @@
            </layout>
           </item>
           <item>
-           <widget class="PlotWidget" name="plotWidgetMag"/>
+           <widget class="PlotWidget" name="plotWidgetMag">
+            <property name="frameShape">
+             <enum>QFrame::Box</enum>
+            </property>
+           </widget>
           </item>
           <item>
-           <widget class="PlotWidget" name="plotWidgetPhase"/>
+           <widget class="PlotWidget" name="plotWidgetPhase">
+            <property name="frameShape">
+             <enum>QFrame::Box</enum>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="PlotWidget" name="plotWidgetFreq">
@@ -826,6 +834,9 @@
               <width>16777215</width>
               <height>16777215</height>
              </size>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::Box</enum>
             </property>
            </widget>
           </item>
