@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow
+from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QTreeWidgetItem
 from PyQt5.uic import loadUi
 from PyQt5 import QtWidgets, uic
 from pyqtgraph import PlotWidget
@@ -14,8 +14,6 @@ from ctypes import cdll, c_long, c_int, c_char_p, create_string_buffer
 
 import numpy as np
 
-import threading
-from threading import Thread
 import time
 import struct
 import socket
@@ -24,8 +22,12 @@ import math
 from ctypes import *
 import datetime  
 
+import PMUstation as pmu
 
 class MainWindow(QMainWindow):
+
+    pmus_list = []
+
     connected = 0
     pressed = 0
     counter = 0
@@ -112,6 +114,44 @@ class MainWindow(QMainWindow):
         self.graph_phase.setBackground('w')
         self.graph_phase.setYRange(200.0, 230.0, padding=0)
         self.graph_phase.setXRange(0.0, 10.0, padding=0)
+
+        # Formatting the treeWidget
+        self.treeWidgetPMU.setColumnWidth(0, 150)
+        self.treeWidgetPMU.setColumnWidth(1, 20)
+        self.treeWidgetPMU.setColumnWidth(2, 20)
+
+        self.btnAddPMU.clicked.connect(self.onBtnAddPMUclicked)
+
+
+    
+    def onBtnAddPMUclicked(self):
+        pmu1 = pmu.PMUstation('PMU1',20,3,'192.168.15.81',4712)
+        self.pmus_list.append(pmu1)
+        pmu1.connect()
+        # Check for connection errors:
+        
+        pmu1.finished.connect(self.finishedtask)
+        pmu1.update.connect(self.updtatetask)
+
+        # Updating the treeWidget:
+        for n in pmu1.pmu_names:
+            #self.treeWidgetPMU.
+            item = QTreeWidgetItem(self.treeWidgetPMU)
+            item.setText(0,n)
+            item.setText(3,'Connected')
+            for ch in pmu1.pmu_phasor_names[n]:
+                subitem = QTreeWidgetItem(item)
+                subitem.setText(0,ch)
+                subitem.setCheckState(1,False)
+                subitem.setCheckState(2,False)
+            
+        #self.pmu1.start()
+
+    def finishedtask(self):
+        print('finished')
+    
+    def updtatetask(self,value):
+        print('Value is: ' + repr(value))
 
     def showTime(self):
         self.pressed = 0
