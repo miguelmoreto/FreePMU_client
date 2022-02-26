@@ -126,7 +126,7 @@
           <item>
            <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0,0,0">
             <item>
-             <layout class="QHBoxLayout" name="horizontalLayoutAddPMU" stretch="0,0,0,0,0,0,0,0,0,0">
+             <layout class="QHBoxLayout" name="horizontalLayoutAddPMU" stretch="0,0,0,0,0,0,0,0,0,0,0">
               <property name="topMargin">
                <number>4</number>
               </property>
@@ -247,11 +247,15 @@
                   <height>30</height>
                  </size>
                 </property>
+                <property name="toolTip">
+                 <string>Add a PMU to the list</string>
+                </property>
                 <property name="text">
                  <string>...</string>
                 </property>
                 <property name="icon">
-                 <iconset theme="list-add"/>
+                 <iconset theme="list-add">
+                  <normaloff>.</normaloff>.</iconset>
                 </property>
                </widget>
               </item>
@@ -263,11 +267,50 @@
                   <height>30</height>
                  </size>
                 </property>
+                <property name="toolTip">
+                 <string>Remove selected PMU</string>
+                </property>
                 <property name="text">
                  <string>...</string>
                 </property>
                 <property name="icon">
-                 <iconset theme="list-remove"/>
+                 <iconset theme="list-remove">
+                  <normaloff>.</normaloff>.</iconset>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="btnDisconnect">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>30</width>
+                  <height>30</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>Disconnect selected PMU</string>
+                </property>
+                <property name="text">
+                 <string>...</string>
+                </property>
+                <property name="icon">
+                 <iconset>
+                  <normaloff>images/broken-link.png</normaloff>images/broken-link.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>20</width>
+                  <height>20</height>
+                 </size>
                 </property>
                </widget>
               </item>

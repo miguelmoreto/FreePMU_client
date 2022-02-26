@@ -26,7 +26,8 @@ import PMUstation as pmu
 
 class MainWindow(QMainWindow):
 
-    pmus_list = []
+    pmus_list = []  # List of PMUstation objects
+    pmus_names = [] # PMUs numbered names to show in the combobox
 
     connected = 0
     pressed = 0
@@ -121,37 +122,78 @@ class MainWindow(QMainWindow):
         self.treeWidgetPMU.setColumnWidth(2, 20)
 
         self.btnAddPMU.clicked.connect(self.onBtnAddPMUclicked)
+        self.btnDisconnect.clicked.connect(self.onBtnDisconnectClicked)
 
 
-    
+    """
+    Add a PMU to the list with the paremeter set in the UI and 
+    starts its thread
+    """
     def onBtnAddPMUclicked(self):
-        pmu1 = pmu.PMUstation('PMU1',20,3,'192.168.15.81',4712)
+        ip = str(self.lineEditIp.text())
+        port = int(self.lineEditPort.text())
+        id = int(self.lineEditPmuId.text())
+        index = len(self.pmus_list)
+        pmu1 = pmu.PMUstation(id,ip,port, index)
         self.pmus_list.append(pmu1)
-        pmu1.connect()
+        self.pmus_names.append('PMU '+ repr(index))
+        
+
         # Check for connection errors:
         
-        pmu1.finished.connect(self.finishedtask)
-        pmu1.update.connect(self.updtatetask)
+        self.pmus_list[index].finished.connect(self.finishedtask)
+        self.pmus_list[index].update.connect(self.updtatetask)
+        self.pmus_list[index].message.connect(self.taskmessage)
+        self.pmus_list[index].dataframereaded.connect(self.taskDataFrameReaded)
 
-        # Updating the treeWidget:
-        for n in pmu1.pmu_names:
-            #self.treeWidgetPMU.
-            item = QTreeWidgetItem(self.treeWidgetPMU)
-            item.setText(0,n)
-            item.setText(3,'Connected')
-            for ch in pmu1.pmu_phasor_names[n]:
-                subitem = QTreeWidgetItem(item)
-                subitem.setText(0,ch)
-                subitem.setCheckState(1,False)
-                subitem.setCheckState(2,False)
+        self.pmus_list[index].setCommand(1) # Command to connect the socket.
+
+        self.pmus_list[index].start()
+
+
             
         #self.pmu1.start()
+    
+    def onBtnDisconnectClicked(self):
+        
+        if self.pmus_list[-1].getStatus() == 1:
+            self.pmus_list[-1].setCommand(2) # Command to disconnect the socket.
+            self.pmus_list[-1].start()
+            print('Socket closed!')
+            self.btnDisconnect.setEnabled(False)
 
-    def finishedtask(self):
+
+    def finishedtask(self,idx):
         print('finished')
     
     def updtatetask(self,value):
         print('Value is: ' + repr(value))
+
+    def taskmessage(self,code):
+        if code == 1:
+            self.statusBar().setStyleSheet("color : green; font: bold 14px")
+            self.statusBar().showMessage('Connection sucessful!',5000)
+            self.btnDisconnect.setEnabled(True)
+        elif code == 2:
+            self.statusBar().setStyleSheet("color : red; font: bold 14px")
+            self.statusBar().showMessage('Socket timeout!',5000)
+    
+    def taskDataFrameReaded(self,index):
+        mainiten = QTreeWidgetItem(self.treeWidgetPMU)
+        mainiten.setText(0,self.pmus_names[index])
+        # Updating the treeWidget:
+        for n in self.pmus_list[index].pmu_names:
+            #self.treeWidgetPMU.
+            item = QTreeWidgetItem(mainiten)
+            item.setText(0,n)
+            item.setText(3,'Connected')
+            for ch in self.pmus_list[index].pmu_phasor_names[n]:
+                subitem = QTreeWidgetItem(item)
+                subitem.setText(0,ch)
+                subitem.setCheckState(1,False)
+                subitem.setCheckState(2,False)
+        self.comboPMUs.addItem(self.pmus_names[index])
+        self.treeWidgetPMU.expandAll()
 
     def showTime(self):
         self.pressed = 0
