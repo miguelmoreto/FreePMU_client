@@ -219,9 +219,11 @@ class MainWindow(QMainWindow):
         icon.addPixmap(QtGui.QPixmap("images/broken-link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.btnDisconnect.setIcon(icon)
     
-    def taskUpdateTime(self,time):
-        self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S'))
-        print(str(time))
+    def taskUpdateTime(self,time,fracsec):
+        tempstr = "{0}  {1:.4f}".format(time.strftime('%d/%m/%Y %H:%M:%S'),fracsec)
+        #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
+        self.labelTimeStamp.setText(tempstr)
+        print(str(time)+str(fracsec))
 
     def showTime(self):
         self.pressed = 0

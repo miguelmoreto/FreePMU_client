@@ -39,7 +39,7 @@ class PMUstation(QThread):
     # Thread signals:
     finished = pyqtSignal(int)
     update = pyqtSignal(int)
-    updatetime = pyqtSignal(datetime.datetime)
+    updatetime = pyqtSignal(datetime.datetime,float)
     dataframereaded = pyqtSignal(int)
     message = pyqtSignal(int)
 
@@ -157,7 +157,7 @@ class PMUstation(QThread):
                     self.fracsec_f = float("{:.3f}".format(self.fracsec_f))
                     self.date_time = datetime.datetime.fromtimestamp(soc)  
                     #print("ID CODE:", self.idCode, "SOC:", self.date_time, "FracSec:", self.fracsec_f)
-                    self.updatetime.emit(self.date_time)
+                    self.updatetime.emit(self.date_time,self.fracsec_f)
                     #self.label_time.setText(str(self.date_time))
                     #self.label_frac.setText(str(self.fracsec_f))
                     freq_tmp = (read_buffer[40] << 24) + (read_buffer[41] << 16) + (read_buffer[42] << 8) + read_buffer[43]
