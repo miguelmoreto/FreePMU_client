@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QApplication, QDialog, QMainWindow, QTreeWidgetItem
 from PyQt5.uic import loadUi
-from PyQt5 import QtWidgets, uic
+from PyQt5 import QtWidgets, uic, QtGui
 from pyqtgraph import PlotWidget
 import pyqtgraph as pg
 
@@ -28,6 +28,8 @@ class MainWindow(QMainWindow):
 
     pmus_list = []  # List of PMUstation objects
     pmus_names = [] # PMUs numbered names to show in the combobox
+
+    data_to_plot = {}
 
     connected = 0
     pressed = 0
@@ -145,6 +147,7 @@ class MainWindow(QMainWindow):
         self.pmus_list[index].update.connect(self.updtatetask)
         self.pmus_list[index].message.connect(self.taskmessage)
         self.pmus_list[index].dataframereaded.connect(self.taskDataFrameReaded)
+        self.pmus_list[index].updatetime.connect(self.taskUpdateTime)
 
         self.pmus_list[index].setCommand(1) # Command to connect the socket.
 
@@ -155,13 +158,20 @@ class MainWindow(QMainWindow):
         #self.pmu1.start()
     
     def onBtnDisconnectClicked(self):
-        
-        if self.pmus_list[-1].getStatus() == 1:
-            self.pmus_list[-1].setCommand(2) # Command to disconnect the socket.
-            self.pmus_list[-1].start()
+        index = self.comboPMUs.currentIndex()
+        icon = QtGui.QIcon()
+        if self.pmus_list[index].getStatus() == 1:
+            self.pmus_list[index].setCommand(2) # Command to disconnect the socket.
+            #self.pmus_list[-1].start()
+            icon.addPixmap(QtGui.QPixmap("images/link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.btnDisconnect.setIcon(icon)   
             print('Socket closed!')
-            self.btnDisconnect.setEnabled(False)
-
+            #self.btnDisconnect.setEnabled(False)
+        elif self.pmus_list[index].getStatus() == 0:
+            self.pmus_list[index].setCommand(3) # Command to re-connect the socket.
+            self.pmus_list[index].start()
+            icon.addPixmap(QtGui.QPixmap("images/broken-link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.btnDisconnect.setIcon(icon)
 
     def finishedtask(self,idx):
         print('finished')
@@ -170,13 +180,22 @@ class MainWindow(QMainWindow):
         print('Value is: ' + repr(value))
 
     def taskmessage(self,code):
+        
         if code == 1:
             self.statusBar().setStyleSheet("color : green; font: bold 14px")
             self.statusBar().showMessage('Connection sucessful!',5000)
-            self.btnDisconnect.setEnabled(True)
+            #self.btnDisconnect.setEnabled(True)
         elif code == 2:
             self.statusBar().setStyleSheet("color : red; font: bold 14px")
             self.statusBar().showMessage('Socket timeout!',5000)
+        elif code == 3:
+            self.statusBar().setStyleSheet("color : green; font: bold 14px")
+            self.statusBar().showMessage('Re-connection sucessful!',5000)
+        elif code == 4:
+            self.statusBar().setStyleSheet("color : orange; font: bold 14px")
+            self.statusBar().showMessage('PMU disconnected!',5000)
+
+
     
     def taskDataFrameReaded(self,index):
         mainiten = QTreeWidgetItem(self.treeWidgetPMU)
@@ -193,7 +212,16 @@ class MainWindow(QMainWindow):
                 subitem.setCheckState(1,False)
                 subitem.setCheckState(2,False)
         self.comboPMUs.addItem(self.pmus_names[index])
+        self.labelCurPMUname.setText(self.pmus_names[index])
         self.treeWidgetPMU.expandAll()
+        self.btnDisconnect.setEnabled(True)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("images/broken-link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.btnDisconnect.setIcon(icon)
+    
+    def taskUpdateTime(self,time):
+        self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S'))
+        print(str(time))
 
     def showTime(self):
         self.pressed = 0
