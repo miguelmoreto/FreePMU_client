@@ -1,6 +1,6 @@
 
 #
-#  A PMU can contain data from multiple units.
+#  A PMU device can contain multiple PMUs frames.
 
 from PyQt5.QtCore import QThread, pyqtSignal, QDate, QTime, QDateTime
 from time import sleep
