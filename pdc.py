@@ -124,9 +124,58 @@ class MainWindow(QMainWindow):
         self.treeWidgetPMU.setColumnWidth(2, 20)
 
         self.btnAddPMU.clicked.connect(self.onBtnAddPMUclicked)
+        self.btnRemovePMU.clicked.connect(self.onbtnRemovePMUclicked)
         self.btnDisconnect.clicked.connect(self.onBtnDisconnectClicked)
+        """        
+        mainiten = QTreeWidgetItem(self.treeWidgetPMU)
+        mainiten.setText(0,'PMU1')
+        item = QTreeWidgetItem(mainiten)
+        item.setText(0,'RST')
+        
+        subitem = QTreeWidgetItem(item)
+        subitem.setText(0,'canal')
+        
+        subitem.setCheckState(1,False)
+        subitem.setCheckState(2,False)
+        """
+        self.treeWidgetPMU.itemChanged.connect(self.onTreeWidgetChange)
 
 
+    def onTreeWidgetChange(self,item,column):
+
+        chName = item.text(0)
+        if column == 1: # plot checkbox changed
+            status = item.checkState(column)
+            if (status == QtCore.Qt.Checked):
+                print('Channel {0} Plot status ON'.format(chName))
+            else:
+                print('Channel {0} Plot status OFF'.format(chName))
+        elif column == 2: # export checkbox changed
+            status = item.checkState(column)
+            if (status == QtCore.Qt.Checked):
+                print('Channel {0} Export status ON'.format(chName))
+            else:
+                print('Channel {0} Export status OFF'.format(chName))
+        
+        
+
+
+    """
+    Remove a PMU from the list, stop and delete the corresponding thread.
+    """
+    def onbtnRemovePMUclicked(self):
+        itemtext = self.comboPMUs.currentText()
+        index = self.comboPMUs.currentIndex()
+        total = self.treeWidgetPMU.topLevelItemCount()
+        if itemtext: # Do something only if exists at least one item in the combobox
+            self.treeWidgetPMU.takeTopLevelItem(index)
+            self.comboPMUs.removeItem(index)
+            self.pmus_list[index].terminate()
+            del self.pmus_list[index]
+        
+            if total == 1: # if it is the last item, disable the button.
+                self.btnRemovePMU.setEnabled(False)
+        
     """
     Add a PMU to the list with the paremeter set in the UI and 
     starts its thread
@@ -136,6 +185,7 @@ class MainWindow(QMainWindow):
         port = int(self.lineEditPort.text())
         id = int(self.lineEditPmuId.text())
         index = len(self.pmus_list)
+        print(index)
         pmu1 = pmu.PMUstation(id,ip,port, index)
         self.pmus_list.append(pmu1)
         self.pmus_names.append('PMU '+ repr(index))
@@ -147,7 +197,7 @@ class MainWindow(QMainWindow):
         self.pmus_list[index].update.connect(self.updtatetask)
         self.pmus_list[index].message.connect(self.taskmessage)
         self.pmus_list[index].dataframereaded.connect(self.taskDataFrameReaded)
-        self.pmus_list[index].updatetime.connect(self.taskUpdateTime)
+        self.pmus_list[index].updateTimeFreq.connect(self.taskUpdateTimeFreq)
 
         self.pmus_list[index].setCommand(1) # Command to connect the socket.
 
@@ -177,7 +227,8 @@ class MainWindow(QMainWindow):
         print('finished')
     
     def updtatetask(self,value):
-        print('Value is: ' + repr(value))
+        pass
+        #print('Value is: ' + repr(value))
 
     def taskmessage(self,code):
         
@@ -198,6 +249,7 @@ class MainWindow(QMainWindow):
 
     
     def taskDataFrameReaded(self,index):
+        self.treeWidgetPMU.itemChanged.disconnect() # to avoid executing the callback at this time
         mainiten = QTreeWidgetItem(self.treeWidgetPMU)
         mainiten.setText(0,self.pmus_names[index])
         # Updating the treeWidget:
@@ -212,18 +264,22 @@ class MainWindow(QMainWindow):
                 subitem.setCheckState(1,False)
                 subitem.setCheckState(2,False)
         self.comboPMUs.addItem(self.pmus_names[index])
+        self.comboPMUs.setCurrentIndex(len(self.pmus_names)-1)
         self.labelCurPMUname.setText(self.pmus_names[index])
         self.treeWidgetPMU.expandAll()
         self.btnDisconnect.setEnabled(True)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("images/broken-link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.btnDisconnect.setIcon(icon)
+        self.btnRemovePMU.setEnabled(True)
+        self.treeWidgetPMU.itemChanged.connect(self.onTreeWidgetChange)
     
-    def taskUpdateTime(self,time,fracsec):
+    def taskUpdateTimeFreq(self,time,fracsec,freq):
         tempstr = "{0}  {1:.4f}".format(time.strftime('%d/%m/%Y %H:%M:%S'),fracsec)
         #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
         self.labelTimeStamp.setText(tempstr)
-        print(str(time)+str(fracsec))
+        self.labelFreqValue.setText('{0:.5f} Hz'.format(freq))
+        #print(str(time)+str(fracsec))
 
     def showTime(self):
         self.pressed = 0

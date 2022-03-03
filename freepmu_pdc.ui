@@ -261,6 +261,9 @@
               </item>
               <item>
                <widget class="QToolButton" name="btnRemovePMU">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
                 <property name="maximumSize">
                  <size>
                   <width>30</width>
