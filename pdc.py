@@ -35,6 +35,9 @@ class MainWindow(QMainWindow):
     pressed = 0
     counter = 0
     idx = 0.0
+
+    selected_to_plotRT = [] # List of the selected channel names do plot in Real-time
+
     overflow = False
     graph_data_y0 = []
     graph_data_y1 = []
@@ -148,8 +151,10 @@ class MainWindow(QMainWindow):
             status = item.checkState(column)
             if (status == QtCore.Qt.Checked):
                 print('Channel {0} Plot status ON'.format(chName))
+                self.selected_to_plotRT.append(chName)
             else:
                 print('Channel {0} Plot status OFF'.format(chName))
+                self.selected_to_plotRT.remove(chName)
         elif column == 2: # export checkbox changed
             status = item.checkState(column)
             if (status == QtCore.Qt.Checked):
@@ -223,6 +228,8 @@ class MainWindow(QMainWindow):
         #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
         self.labelTimeStamp.setText(tempstr)
         self.labelFreqValue.setText('{0:.5f} Hz'.format(frame.dataframe['freq']))
+        for chName in self.selected_to_plotRT:
+            print(frame.dataframe[chName])
 
     def onTaskFinished(self,idx):
         print('{0} task finished.'.format(self.pmus_names[idx]))

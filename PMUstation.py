@@ -7,6 +7,7 @@ from time import sleep
 import datetime
 import socket
 from ctypes import *
+import math
 
 """
 An object to contain the information of a single data frame.
@@ -23,7 +24,7 @@ class PMUdataframe(object):
 class PMUstation(QThread):
 
     idCode = 0
-    num_pmus = 0        # Number of PMU devices (data streams) in this PMU station
+    num_pmu = 0        # Number of PMU devices (data streams) in this PMU station
     num_phasors = []    # Number of phasors in each PMU device
     num_analogs = []    # Number of analog channels in each PMU device
     num_digitals = []   # Number of digital channels in each PMU device
@@ -42,6 +43,7 @@ class PMUstation(QThread):
     index = 0           # Index of the PMU station in the list.
 
     offsets = []
+    frame_counter = 0
 
     frame = PMUdataframe()
     # Message codes: 1 socket connected
@@ -84,7 +86,17 @@ class PMUstation(QThread):
                     self.tcpSocket.send(buffer)
                     buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05'
                     self.tcpSocket.send(buffer)
-                    read_buffer = self.tcpSocket.recv(804)
+
+                    read_buffer = bytes(0)
+                    to_rcv = 804
+                    while (to_rcv > 0):
+                        read_tmp = self.tcpSocket.recv(to_rcv)
+                        to_rcv = to_rcv - len(read_tmp)
+                        read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
+                        #if to_rcv > 0:
+                        #    print('To receive {0} bytes a'.format(to_rcv))
+
+                    #read_buffer = self.tcpSocket.recv(804)
                     if read_buffer[1] == 49:
                         self.num_pmu = (read_buffer[18] << 8) + read_buffer[19]
                         nom_freq = read_buffer[107]
@@ -107,6 +119,7 @@ class PMUstation(QThread):
                             offset = offset + 30 + self.num_phasors[i]*16 + self.num_phasors[i]*4
                             self.offsets.append(10+self.num_phasors[i]*8+self.offsets[i])                                                                        
                         
+                        # TODO: incorporate this for in the previous one.
                         for j in range(0, self.num_pmu):
                             for i in range(0, self.num_phasors[j]):
                                 if j == 0:
@@ -155,9 +168,19 @@ class PMUstation(QThread):
         # Data receiving infinite loop:
         while(self.status == 1):
             sleep(0.01)
-            read_buffer = self.tcpSocket.recv(320)
+            
+            read_buffer = bytes()
+            to_rcv = 320
+            while (to_rcv > 0):
+                read_tmp = self.tcpSocket.recv(to_rcv)
+                to_rcv = to_rcv - len(read_tmp)
+                read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
+                if to_rcv > 0:
+                    print('To receive {0} bytes'.format(to_rcv))
+
+
             if read_buffer:
-                if (read_buffer[0] == 170) and (read_buffer[1] == 1):
+                if (read_buffer[0] == 170) and (read_buffer[1] == 1): # Check 0xAA01 (Data frame)
                     #print(read_buffer)
                     frame_size = (read_buffer[2] << 8) + read_buffer[3]
                     self.idCode = (read_buffer[4] << 8) + read_buffer[5]
@@ -173,6 +196,25 @@ class PMUstation(QThread):
                     self.frame.dataframe['freq'] = self.freq
                     self.frame.fracsec = self.fracsec_f
                     self.frame.timestamp = self.date_time
+                    k = 0
+                    for j in range(0, self.num_pmu):
+                        k = self.offsets[j]
+                        for i in range(0, self.num_phasors[j]):
+                            #if j == 0:
+                                # Read magnitude:
+                            #print('j: {0} i:{1} k:{2} len:{3} cnt:{4}'.format(j,i,k,len(read_buffer),self.frame_counter))
+                            phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
+                            cp = pointer(c_int(phasor_tmp))           # make this into a c integer
+                            fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
+                            self.frame.dataframe[self.pmu_phasor_names[self.pmu_names[j]][i]] = {'mag':fp.contents.value}
+                            # Read phasor
+                            phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
+                            cp = pointer(c_int(phasor_tmp))           # make this into a c integer
+                            fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
+                            self.frame.dataframe[self.pmu_phasor_names[self.pmu_names[j]][i]].update({'ang':(fp.contents.value * 180.0) / math.pi})                                                                              
+                            
+                            k += 8
+                    self.frame_counter += 1
                     self.onDataFrameReaded.emit(self.frame,self.index)
             #sleep(1)
             i = i + 1
