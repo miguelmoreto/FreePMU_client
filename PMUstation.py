@@ -8,6 +8,18 @@ import datetime
 import socket
 from ctypes import *
 
+"""
+An object to contain the information of a single data frame.
+This object is passed as the argument of the onFrameDataReaded
+signal to the main thread.
+"""
+class PMUdataframe(object):
+    Nch = 0         # Number of data channels
+    dataframe = {}  # Data frame. A dict where the keys are the channel names.
+                    # Each key contains the value of the corresponding channel.
+    timestamp = type(datetime.datetime)
+    fracsec = 0
+
 class PMUstation(QThread):
 
     idCode = 0
@@ -26,35 +38,32 @@ class PMUstation(QThread):
     command = 0         # Command code:   0 does nothing,
                         #                 1 connect socket (send configuration frame)
                         #                 2 disconnect socket 
-                        #                 3 re-connect socket (without sending configuration frame)
-    index = 0           # Index of the PMU station in a list.
+                        #                 3 re-connect socket (without asking configuration frame)
+    index = 0           # Index of the PMU station in the list.
 
     offsets = []
 
+    frame = PMUdataframe()
     # Message codes: 1 socket connected
     #                2 socket timeout
     #                3 socket re-connected
     #                4 socket disconnected
 
     # Thread signals:
-    finished = pyqtSignal(int)
-    update = pyqtSignal(int)
-    updateTimeFreq = pyqtSignal(datetime.datetime,float,float)
-    dataframereaded = pyqtSignal(int)
-    message = pyqtSignal(int)
+    onFinished = pyqtSignal(int)                        # Signal finished task and send PMU list index.
+    onConfigFrameReaded = pyqtSignal(int)               # Signal a config frame readed and send PMU list index.
+    onDataFrameReaded = pyqtSignal(PMUdataframe, int)   # Signal the readed dataframe and PMU list index.
+    onMessage = pyqtSignal(int,int)                     # Signal message code and PMU list index.
 
     def __init__(self, id, ipadr, tcpport, idx, parent = None):
         
         QThread.__init__(self, parent)
-        
         self.idCode = id
         self.tcpport = tcpport
         self.ipaddr = ipadr
         self.index = idx
         self.tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcpSocket.settimeout(5)
-        print(type(parent))
-        print(parent)
 
     def run(self):
         if self.command == 1: # Connect socket and read PMU configuration frame
@@ -65,11 +74,11 @@ class PMUstation(QThread):
                     self.tcpSocket.connect((self.ipaddr,self.tcpport))
                 except socket.timeout:
                     self.tcpSocket.close()
-                    self.message.emit(2) # Message code 2: socket timeout
+                    self.onMessage.emit(2,self.index) # Message code 2: socket timeout
                     self.command = 0 # Reset command
                     return
                 else:
-                    self.message.emit(1) # Message code 1: socket sucessfuly connected
+                    self.onMessage.emit(1,self.index) # Message code 1: socket sucessfuly connected
                     self.status = 1      # Status 1: connected
                     buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
                     self.tcpSocket.send(buffer)
@@ -112,7 +121,7 @@ class PMUstation(QThread):
                         
                         #print(self.pmu_phasor_names)
                     print('connected')
-                    self.dataframereaded.emit(self.index) # Signal UI
+                    self.onConfigFrameReaded.emit(self.index) # Signal UI
                     # Signal PMU to start sending data frames:
                     buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
                     self.tcpSocket.send(buffer)
@@ -120,7 +129,7 @@ class PMUstation(QThread):
         elif self.command == 2: # Disconnect socket
             if self.status == 1:
                 self.tcpSocket.close()
-                self.message.emit(4) # Message code 4: socket disconnected
+                self.onMessage.emit(4,self.index) # Message code 4: socket disconnected
                 self.status = 0
         
         elif self.command == 3: # Re-connect socket
@@ -131,11 +140,11 @@ class PMUstation(QThread):
                     self.tcpSocket.connect((self.ipaddr,self.tcpport))
                 except socket.timeout:
                     self.tcpSocket.close()
-                    self.message.emit(2) # Message code 2: socket timeout
+                    self.onMessage.emit(2,self.index) # Message code 2: socket timeout
                     self.command = 0 # Reset command
                     #return
                 else:
-                    self.message.emit(3) # Message code 3: socket sucessfuly re-connected
+                    self.onMessage.emit(3,self.index) # Message code 3: socket sucessfuly re-connected
                     self.status = 1      # Status 1: connected
                     buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
                     self.tcpSocket.send(buffer)
@@ -143,6 +152,7 @@ class PMUstation(QThread):
         
         self.command = 0 # Reset command
         i = 0
+        # Data receiving infinite loop:
         while(self.status == 1):
             sleep(0.01)
             read_buffer = self.tcpSocket.recv(320)
@@ -156,32 +166,26 @@ class PMUstation(QThread):
                     self.fracsec_f = fracsec / 1000000.0
                     self.fracsec_f = float("{:.3f}".format(self.fracsec_f))
                     self.date_time = datetime.datetime.fromtimestamp(soc)  
-                    #print("ID CODE:", self.idCode, "SOC:", self.date_time, "FracSec:", self.fracsec_f)
-                    #self.label_time.setText(str(self.date_time))
-                    #self.label_frac.setText(str(self.fracsec_f))
                     freq_tmp = (read_buffer[40] << 24) + (read_buffer[41] << 16) + (read_buffer[42] << 8) + read_buffer[43]
                     cp = pointer(c_int(freq_tmp))           # make this into a c integer
                     fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                     self.freq = fp.contents.value         # dereference the pointer, get the float
-                    self.updateTimeFreq.emit(self.date_time,self.fracsec_f,self.freq)
+                    self.frame.dataframe['freq'] = self.freq
+                    self.frame.fracsec = self.fracsec_f
+                    self.frame.timestamp = self.date_time
+                    self.onDataFrameReaded.emit(self.frame,self.index)
             #sleep(1)
-            self.update.emit(i)
             i = i + 1
             if (self.command == 2):
                 # Signal the PMU to stop sending data frames:
                 buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
                 self.tcpSocket.send(buffer)
                 self.tcpSocket.close()
-                self.message.emit(4) # Message code 4: socket disconnected
+                self.onMessage.emit(4,self.index) # Message code 4: socket disconnected
                 self.status = 0
                 self.command = 0
         
-        self.finished.emit(self.index)           
-        #for i in range(3):
-        #    
-        #    self.update.emit(i + 1)
-        #self.finished.emit(self.index)
-
+        self.onFinished.emit(self.index)           
     
     def setCommand(self,cmd):
         self.command = cmd

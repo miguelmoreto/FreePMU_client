@@ -190,21 +190,16 @@ class MainWindow(QMainWindow):
         self.pmus_list.append(pmu1)
         self.pmus_names.append('PMU '+ repr(index))
         
-
         # Check for connection errors:
         
-        self.pmus_list[index].finished.connect(self.finishedtask)
-        self.pmus_list[index].update.connect(self.updtatetask)
-        self.pmus_list[index].message.connect(self.taskmessage)
-        self.pmus_list[index].dataframereaded.connect(self.taskDataFrameReaded)
-        self.pmus_list[index].updateTimeFreq.connect(self.taskUpdateTimeFreq)
+        self.pmus_list[index].onFinished.connect(self.onTaskFinished)
+        self.pmus_list[index].onMessage.connect(self.onTaskMessage)
+        self.pmus_list[index].onConfigFrameReaded.connect(self.onTaskConfigFrameReaded)
+        self.pmus_list[index].onDataFrameReaded.connect(self.onTaskDataFrameReaded)
 
         self.pmus_list[index].setCommand(1) # Command to connect the socket.
 
         self.pmus_list[index].start()
-
-
-            
         #self.pmu1.start()
     
     def onBtnDisconnectClicked(self):
@@ -215,7 +210,7 @@ class MainWindow(QMainWindow):
             #self.pmus_list[-1].start()
             icon.addPixmap(QtGui.QPixmap("images/link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
             self.btnDisconnect.setIcon(icon)   
-            print('Socket closed!')
+            print('{0} socket closed!'.format(self.pmus_names[index]))
             #self.btnDisconnect.setEnabled(False)
         elif self.pmus_list[index].getStatus() == 0:
             self.pmus_list[index].setCommand(3) # Command to re-connect the socket.
@@ -223,32 +218,33 @@ class MainWindow(QMainWindow):
             icon.addPixmap(QtGui.QPixmap("images/broken-link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
             self.btnDisconnect.setIcon(icon)
 
-    def finishedtask(self,idx):
-        print('finished')
-    
-    def updtatetask(self,value):
-        pass
-        #print('Value is: ' + repr(value))
+    def onTaskDataFrameReaded(self, frame, idx):
+        tempstr = "{0}  {1:.4f}".format(time.strftime('%d/%m/%Y %H:%M:%S'),frame.fracsec)
+        #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
+        self.labelTimeStamp.setText(tempstr)
+        self.labelFreqValue.setText('{0:.5f} Hz'.format(frame.dataframe['freq']))
 
-    def taskmessage(self,code):
+    def onTaskFinished(self,idx):
+        print('{0} task finished.'.format(self.pmus_names[idx]))
+    
+    def onTaskMessage(self,code,idx):
         
         if code == 1:
             self.statusBar().setStyleSheet("color : green; font: bold 14px")
-            self.statusBar().showMessage('Connection sucessful!',5000)
+            self.statusBar().showMessage('{0} connection sucessful!'.format(self.pmus_names[idx]),5000)
             #self.btnDisconnect.setEnabled(True)
         elif code == 2:
             self.statusBar().setStyleSheet("color : red; font: bold 14px")
-            self.statusBar().showMessage('Socket timeout!',5000)
+            self.statusBar().showMessage('{0} socket timeout!'.format(self.pmus_names[idx]),5000)
         elif code == 3:
             self.statusBar().setStyleSheet("color : green; font: bold 14px")
-            self.statusBar().showMessage('Re-connection sucessful!',5000)
+            self.statusBar().showMessage('{0} re-connection sucessful!'.format(self.pmus_names[idx]),5000)
         elif code == 4:
             self.statusBar().setStyleSheet("color : orange; font: bold 14px")
-            self.statusBar().showMessage('PMU disconnected!',5000)
-
+            self.statusBar().showMessage('{0} disconnected!'.format(self.pmus_names[idx]),5000)
 
     
-    def taskDataFrameReaded(self,index):
+    def onTaskConfigFrameReaded(self,index):
         self.treeWidgetPMU.itemChanged.disconnect() # to avoid executing the callback at this time
         mainiten = QTreeWidgetItem(self.treeWidgetPMU)
         mainiten.setText(0,self.pmus_names[index])
@@ -273,13 +269,6 @@ class MainWindow(QMainWindow):
         self.btnDisconnect.setIcon(icon)
         self.btnRemovePMU.setEnabled(True)
         self.treeWidgetPMU.itemChanged.connect(self.onTreeWidgetChange)
-    
-    def taskUpdateTimeFreq(self,time,fracsec,freq):
-        tempstr = "{0}  {1:.4f}".format(time.strftime('%d/%m/%Y %H:%M:%S'),fracsec)
-        #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
-        self.labelTimeStamp.setText(tempstr)
-        self.labelFreqValue.setText('{0:.5f} Hz'.format(freq))
-        #print(str(time)+str(fracsec))
 
     def showTime(self):
         self.pressed = 0
