@@ -22,4 +22,11 @@ This program is part of the FreePMU project.
 * Data from different PMUs in the real-time plot  is not guaranteed to be synchronized to each other. The data are just plotted as they arrived (in the export data file and offiline analysis the data is synchronized by the timestamp).
 
 
+- - -
+
+
+![Federal University of Santa Catarina](./images/ufsc_logo.png?raw=true)
+
+![Technological University of Parana](./images/utfpr_logo.png?raw=true)
+
 [^1]: This was not tested yet.
