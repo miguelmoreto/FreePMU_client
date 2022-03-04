@@ -44,6 +44,10 @@ class PMUstation(QThread):
 
     offsets = []
     frame_counter = 0
+    phasor_format = 1    # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+    analog_format = 1   # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+    freq_format = 1     # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+    numBytesData = 0    # Number of bytes in the data frame
 
     frame = PMUdataframe()
     # Message codes: 1 socket connected
@@ -66,6 +70,9 @@ class PMUstation(QThread):
         self.index = idx
         self.tcpSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcpSocket.settimeout(5)
+        self.phasor_format = 1    # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+        self.analog_format = 1   # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+        self.freq_format = 1     # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
 
     def run(self):
         if self.command == 1: # Connect socket and read PMU configuration frame
@@ -89,6 +96,7 @@ class PMUstation(QThread):
 
                     read_buffer = bytes(0)
                     to_rcv = 804
+                    # Sometimes the socket read does not return all the required bytes.
                     while (to_rcv > 0):
                         read_tmp = self.tcpSocket.recv(to_rcv)
                         to_rcv = to_rcv - len(read_tmp)
@@ -96,7 +104,6 @@ class PMUstation(QThread):
                         #if to_rcv > 0:
                         #    print('To receive {0} bytes a'.format(to_rcv))
 
-                    #read_buffer = self.tcpSocket.recv(804)
                     if read_buffer[1] == 49:
                         self.num_pmu = (read_buffer[18] << 8) + read_buffer[19]
                         nom_freq = read_buffer[107]
@@ -131,13 +138,18 @@ class PMUstation(QThread):
                                 elif j == 3:
                                     self.pmu_phasor_names[self.pmu_names[j]].append(str(read_buffer[(436+self.num_phasors[j-1]*16+16*i):(452+self.num_phasors[j-1]*16+16*i)], 'UTF-8').strip())
                         
-                        
                         #print(self.pmu_phasor_names)
-                    print('connected')
-                    self.onConfigFrameReaded.emit(self.index) # Signal UI
-                    # Signal PMU to start sending data frames:
-                    buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
-                    self.tcpSocket.send(buffer)
+                        #print('connected')
+                        self.onConfigFrameReaded.emit(self.index) # Signal UI
+                        self.calculateDataFrameSize()
+                        print('PMU {0} data frame has {1} bytes.'.format(self.index,self.numBytesData))
+                        # Signal PMU to start sending data frames:
+                        buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
+                        self.tcpSocket.send(buffer)
+                    else:
+                        print('PMU{0} received incorrect configuration frame type or version'.format(self.index))
+                        self.status = 0      # Status 1: connected
+                        self.tcpSocket.close()
 
         elif self.command == 2: # Disconnect socket
             if self.status == 1:
@@ -168,16 +180,15 @@ class PMUstation(QThread):
         # Data receiving infinite loop:
         while(self.status == 1):
             sleep(0.01)
-            
             read_buffer = bytes()
-            to_rcv = 320
+            to_rcv = self.numBytesData
+            # Sometimes the socket read does not return all the required bytes.
             while (to_rcv > 0):
                 read_tmp = self.tcpSocket.recv(to_rcv)
                 to_rcv = to_rcv - len(read_tmp)
                 read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
-                if to_rcv > 0:
-                    print('To receive {0} bytes'.format(to_rcv))
-
+                #if to_rcv > 0:
+                #    print('To receive {0} bytes'.format(to_rcv))
 
             if read_buffer:
                 if (read_buffer[0] == 170) and (read_buffer[1] == 1): # Check 0xAA01 (Data frame)
@@ -200,8 +211,6 @@ class PMUstation(QThread):
                     for j in range(0, self.num_pmu):
                         k = self.offsets[j]
                         for i in range(0, self.num_phasors[j]):
-                            #if j == 0:
-                                # Read magnitude:
                             #print('j: {0} i:{1} k:{2} len:{3} cnt:{4}'.format(j,i,k,len(read_buffer),self.frame_counter))
                             phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
                             cp = pointer(c_int(phasor_tmp))           # make this into a c integer
@@ -212,11 +221,9 @@ class PMUstation(QThread):
                             cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                             fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
                             self.frame.dataframe[self.pmu_phasor_names[self.pmu_names[j]][i]].update({'ang':(fp.contents.value * 180.0) / math.pi})                                                                              
-                            
                             k += 8
                     self.frame_counter += 1
                     self.onDataFrameReaded.emit(self.frame,self.index)
-            #sleep(1)
             i = i + 1
             if (self.command == 2):
                 # Signal the PMU to stop sending data frames:
@@ -240,6 +247,32 @@ class PMUstation(QThread):
     
     def updateTcpPort(self, port):
         self.tcpport = port
+    
+    """ 
+    Calculates the size in bytes of the data frame based on
+    the information obtained in the header frame.
+    """
+    def calculateDataFrameSize(self):
+        total = 0
+        for i in range(0, self.num_pmu):
+            if self.phasor_format:
+                total = total + self.num_phasors[i] * 8 # Two values per phasor, 4 bytes each.
+            else:
+                total = total + self.num_phasors[i] * 4
+            if self.freq_format:
+                total = total + 2 * 4 # Two values (freq and rocof), 4 bytes each.
+            else:
+                total = total + 2 * 2 
+            if self.analog_format:
+                total = total + self.num_analogs[i] * 4 # 4 bytes each analog channel.
+            else:
+                total = total + self.num_analogs[i] * 2
+            total = total + self.num_digitals[i] * 2    # 2 bytes per digital channel.
+            total = total + 2   # Stat field, 2 bytes
+
+        self.numBytesData = total + 16 # 16 bytes for fixed header and CRC fields.
+
+        
 
 
 

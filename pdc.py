@@ -129,18 +129,6 @@ class MainWindow(QMainWindow):
         self.btnAddPMU.clicked.connect(self.onBtnAddPMUclicked)
         self.btnRemovePMU.clicked.connect(self.onbtnRemovePMUclicked)
         self.btnDisconnect.clicked.connect(self.onBtnDisconnectClicked)
-        """        
-        mainiten = QTreeWidgetItem(self.treeWidgetPMU)
-        mainiten.setText(0,'PMU1')
-        item = QTreeWidgetItem(mainiten)
-        item.setText(0,'RST')
-        
-        subitem = QTreeWidgetItem(item)
-        subitem.setText(0,'canal')
-        
-        subitem.setCheckState(1,False)
-        subitem.setCheckState(2,False)
-        """
         self.treeWidgetPMU.itemChanged.connect(self.onTreeWidgetChange)
 
 
@@ -172,14 +160,26 @@ class MainWindow(QMainWindow):
         itemtext = self.comboPMUs.currentText()
         index = self.comboPMUs.currentIndex()
         total = self.treeWidgetPMU.topLevelItemCount()
+        icon = QtGui.QIcon()
         if itemtext: # Do something only if exists at least one item in the combobox
+            if self.pmus_list[index].getStatus() == 1:
+                self.pmus_list[index].setCommand(2) # Command to disconnect the socket.
+                icon.addPixmap(QtGui.QPixmap("images/link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
+                self.btnDisconnect.setIcon(icon)
+                self.btnDisconnect.setEnabled(False)
+                print('{0} socket closed!'.format(self.pmus_names[index]))
+                time.sleep(0.1)
+                self.pmus_list[index].terminate()
             self.treeWidgetPMU.takeTopLevelItem(index)
             self.comboPMUs.removeItem(index)
-            self.pmus_list[index].terminate()
+            
             del self.pmus_list[index]
         
             if total == 1: # if it is the last item, disable the button.
                 self.btnRemovePMU.setEnabled(False)
+                self.labelCurPMUname.setText('PMUx')
+                self.labelTimeStamp.setText('--/--/---- --:--')
+                self.labelFreqValue.setText('--.----- Hz')
         
     """
     Add a PMU to the list with the paremeter set in the UI and 
