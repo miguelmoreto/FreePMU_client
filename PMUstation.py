@@ -24,12 +24,17 @@ class PMUdataframe(object):
 class PMUstation(QThread):
 
     idCode = 0
-    num_pmu = 0        # Number of PMU devices (data streams) in this PMU station
-    num_phasors = []    # Number of phasors in each PMU device
-    num_analogs = []    # Number of analog channels in each PMU device
-    num_digitals = []   # Number of digital channels in each PMU device
-    pmu_names = []      # List with the names of all PMU devices
-    pmu_phasor_names = {}       # Dictionary containing a list of phasor names for for each PMU device
+    num_pmu = 0             # Number of PMU devices (data streams) in this PMU station
+    num_phasors = []        # Number of phasors in each PMU device
+    num_analogs = []        # Number of analog channels in each PMU device
+    num_digitals = []       # Number of digital channels in each PMU device
+    pmu_names = []          # List with the names of all PMU devices
+    pmu_phasor_names = {}   # Dictionary containing a list of phasor names for each PMU device
+    pmu_phasor_cf = {}      # Dictionary containing a list of phasor conversion factors for each PMU device
+    pmu_analog_cf = {}      # Dictionary containing a list of analog channels conversion factors for each PMU device
+    pmu_digital_mw = {}     # Dictionary containing a list of masks for digital status words for each PMU device
+    pmu_fnom = {}           # Dictionary containing a list of nominal frequency values for each PMU device
+    pmu_cfgcnt = {}         # Dictionary containing a list of Configuration change count values for each PMU device
     nominal_frequency = 60
     fracsec_f = 0
     tcpport = 0
@@ -89,9 +94,9 @@ class PMUstation(QThread):
                 else:
                     self.onMessage.emit(1,self.index) # Message code 1: socket sucessfuly connected
                     self.status = 1      # Status 1: connected
-                    buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+                    buffer = b'\xAA\x42\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
                     self.tcpSocket.send(buffer)
-                    buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05'
+                    buffer = b'\xAA\x42\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05'
                     self.tcpSocket.send(buffer)
 
                     read_buffer = bytes(0)
@@ -104,47 +109,56 @@ class PMUstation(QThread):
                         #if to_rcv > 0:
                         #    print('To receive {0} bytes a'.format(to_rcv))
 
-                    if read_buffer[1] == 49:
+                    if (read_buffer[0] == 170) and (read_buffer[1] == 50): # Check 0xAA32 (configuration frame 2):
                         self.num_pmu = (read_buffer[18] << 8) + read_buffer[19]
-                        nom_freq = read_buffer[107]
-                        if nom_freq == 0:
-                            self.nominal_freq = 60
-                        else:
-                            self.nominal_freq = 50
-                        offset = 0
+                        #nom_freq = read_buffer[107] # TODO incorporate this in the loop of fields 8 to 19
+                        #if nom_freq == 0:
+                        #    self.nominal_freq = 60
+                        #else:
+                        #    self.nominal_freq = 50
+                        # TODO read idcode, soc, fracsec, timebase
+                        offset = 20
                         self.offsets = []
                         self.offsets.append(16)
                         for i in range(0, self.num_pmu):
-                            name = str(read_buffer[(20+offset):(36+offset)], 'UTF-8').strip()
+                            name = str(read_buffer[(offset):(16+offset)], 'UTF-8').strip()
                             #name = name.replace(' ','_')
                             self.pmu_names.append(name)
                             #print(self.pmu_names)
                             self.pmu_phasor_names[name] = [] # Create dictionary key with the PMU name
-                            self.num_phasors.append((read_buffer[40+offset] << 8) + read_buffer[41+offset])
-                            self.num_analogs.append((read_buffer[42+offset] << 8) + read_buffer[43+offset])
-                            self.num_digitals.append((read_buffer[44+offset] << 8) + read_buffer[45+offset])
-                            offset = offset + 30 + self.num_phasors[i]*16 + self.num_phasors[i]*4
+                            self.pmu_phasor_cf[name] = []
+                            self.num_phasors.append((read_buffer[20+offset] << 8) + read_buffer[21+offset])
+                            self.num_analogs.append((read_buffer[22+offset] << 8) + read_buffer[23+offset])
+                            self.num_digitals.append((read_buffer[24+offset] << 8) + read_buffer[25+offset])
+                            offset = offset + 26 # offset for field 14
+                            for j in range(0, self.num_phasors[i]): # field 14
+                                self.pmu_phasor_names[name].append(str(read_buffer[offset:(offset+16)]))
+                                #print(self.pmu_phasor_names[name])
+                                offset = offset + 16 # offset for field 15
+                            # TODO read channel names for analog channels
+                            # TODO read channel names for digital channels
+                            for j in range(0, self.num_phasors[i]): # field 15
+                                self.pmu_phasor_cf[name].append((read_buffer[offset+4] << 24) + (read_buffer[offset+3] << 16) + (read_buffer[offset+2] << 8) + read_buffer[offset])
+                                offset = offset + 4 # offset for field 16 (at the end of the loop) or field 18 whem no digital and analog channels are considered.
+                            # TODO read Conversion factor for analog channels
+                            # TODO read Mask words for digital status words
+                            #offset = offset + self.num_phasors[j]*4  + self.num_analogs[j]*4 + self.num_digitals[j]*4 # offset for the field 18
+                            if (read_buffer[offset]) == 0: # TODO add each station frequency to the dictionary
+                                self.nominal_freq = 60
+                            else:
+                                self.nominal_freq = 50
+
+                            offset = offset + 4 # offset for the next fiel 8 or for the field 20+
+
+                            #offset = offset + 30 + self.num_phasors[i]*16 + self.num_phasors[i]*4  + self.num_analogs[i]*4 + self.num_digitals[i]*4
                             self.offsets.append(10+self.num_phasors[i]*8+self.offsets[i])                                                                        
                         
-                        # TODO: incorporate this for in the previous one.
-                        for j in range(0, self.num_pmu):
-                            for i in range(0, self.num_phasors[j]):
-                                if j == 0:
-                                    self.pmu_phasor_names[self.pmu_names[j]].append(str(read_buffer[(46+16*i):(62+16*i)], 'UTF-8').strip())
-                                elif j == 1:
-                                    self.pmu_phasor_names[self.pmu_names[j]].append(str(read_buffer[(88+self.num_phasors[j-1]*16+16*i):(104+self.num_phasors[j-1]*16+16*i)], 'UTF-8').strip())
-                                elif j == 2:
-                                    self.pmu_phasor_names[self.pmu_names[j]].append(str(read_buffer[(206+self.num_phasors[j-1]*16+16*i):(222+self.num_phasors[j-1]*16+16*i)], 'UTF-8').strip())
-                                elif j == 3:
-                                    self.pmu_phasor_names[self.pmu_names[j]].append(str(read_buffer[(436+self.num_phasors[j-1]*16+16*i):(452+self.num_phasors[j-1]*16+16*i)], 'UTF-8').strip())
-                        
-                        #print(self.pmu_phasor_names)
-                        #print('connected')
+                        self.data_rate = (read_buffer[offset] << 8) + read_buffer[offset+1]
                         self.onConfigFrameReaded.emit(self.index) # Signal UI
                         self.calculateDataFrameSize()
                         print('PMU {0} data frame has {1} bytes.'.format(self.index,self.numBytesData))
                         # Signal PMU to start sending data frames:
-                        buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
+                        buffer = b'\xAA\x42\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
                         self.tcpSocket.send(buffer)
                     else:
                         print('PMU{0} received incorrect configuration frame type or version'.format(self.index))
@@ -171,7 +185,7 @@ class PMUstation(QThread):
                 else:
                     self.onMessage.emit(3,self.index) # Message code 3: socket sucessfuly re-connected
                     self.status = 1      # Status 1: connected
-                    buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
+                    buffer = b'\xAA\x42\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02'
                     self.tcpSocket.send(buffer)
                     self.status = 1
         
@@ -191,13 +205,13 @@ class PMUstation(QThread):
                 #    print('To receive {0} bytes'.format(to_rcv))
 
             if read_buffer:
-                if (read_buffer[0] == 170) and (read_buffer[1] == 1): # Check 0xAA01 (Data frame)
+                if (read_buffer[0] == 170) and (read_buffer[1] == 2): # Check 0xAA02 (Data frame)
                     #print(read_buffer)
                     frame_size = (read_buffer[2] << 8) + read_buffer[3]
                     self.idCode = (read_buffer[4] << 8) + read_buffer[5]
                     soc = (read_buffer[6] << 24) + (read_buffer[7] << 16) + (read_buffer[8] << 8) + read_buffer[9]
                     fracsec = (read_buffer[10] << 24) + (read_buffer[11] << 16) + (read_buffer[12] << 8) + read_buffer[13]
-                    self.fracsec_f = fracsec / 1000000.0
+                    self.fracsec_f = fracsec / 1000000.0    # TODO use the TIME BASE from the configuration frame.
                     self.fracsec_f = float("{:.3f}".format(self.fracsec_f))
                     self.date_time = datetime.datetime.fromtimestamp(soc)  
                     freq_tmp = (read_buffer[40] << 24) + (read_buffer[41] << 16) + (read_buffer[42] << 8) + read_buffer[43]
@@ -227,7 +241,7 @@ class PMUstation(QThread):
             i = i + 1
             if (self.command == 2):
                 # Signal the PMU to stop sending data frames:
-                buffer = b'\xAA\x41\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+                buffer = b'\xAA\x42\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01'
                 self.tcpSocket.send(buffer)
                 self.tcpSocket.close()
                 self.onMessage.emit(4,self.index) # Message code 4: socket disconnected

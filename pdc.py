@@ -18,6 +18,7 @@ import time
 import struct
 import socket
 import math
+import collections
 
 from ctypes import *
 import datetime  
@@ -36,7 +37,13 @@ class MainWindow(QMainWindow):
     counter = 0
     idx = 0.0
 
+    d_t = 0
     selected_to_plotRT = [] # List of the selected channel names do plot in Real-time
+
+    deque_dict_freq = {}    # Dictionary of deques to store the real time frequency values to plot.
+    deque_dict_mag = {}     # Dictionary of deques to store the real time magnitude values to plot.
+    deque_dict_angle = {}   # Dictionary of deques to store the real time angles values to plot.
+    deque_time = collections.deque()
 
     overflow = False
     graph_data_y0 = []
@@ -90,8 +97,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         loadUi('freepmu_pdc.ui', self)
-        self.pushButton_connect.clicked.connect(self.on_pushButton_connect_clicked)
-        self.comboBox.currentIndexChanged.connect(self.on_comboBox_clicked)
+        #self.pushButton_connect.clicked.connect(self.on_pushButton_connect_clicked)
+        #self.comboBox.currentIndexChanged.connect(self.on_comboBox_clicked)
+        self.deque_time = collections.deque(maxlen=300)
+
+        self.pen0 = pg.mkPen(color=(255, 0, 0))
+
         self.timer1 = QtCore.QTimer()
         self.timer1.timeout.connect(self.showTime)
 
@@ -115,11 +126,11 @@ class MainWindow(QMainWindow):
         self.plotWidgetFreq.showGrid(x=True,y=True)
         self.graph_freq.setXRange(0.0, 10.0, padding=0)
 
-        self.graph_phase.setLabel('left', "<span style=\"color:blue;font-size:12px\">Magnitude (V)</span>")
-        self.graph_phase.setLabel('bottom', "<span style=\"color:blue;font-size:12px\">Time (s)</span>")
-        self.graph_phase.setBackground('w')
-        self.graph_phase.setYRange(200.0, 230.0, padding=0)
-        self.graph_phase.setXRange(0.0, 10.0, padding=0)
+        self.graph_mag.setLabel('left', "<span style=\"color:blue;font-size:12px\">Magnitude (V)</span>")
+        self.graph_mag.setLabel('bottom', "<span style=\"color:blue;font-size:12px\">Time (s)</span>")
+        self.graph_mag.setBackground('w')
+        self.graph_mag.setYRange(200.0, 230.0, padding=0)
+        self.graph_mag.setXRange(0.0, 10.0, padding=0)
 
         # Formatting the treeWidget
         self.treeWidgetPMU.setColumnWidth(0, 150)
@@ -174,6 +185,7 @@ class MainWindow(QMainWindow):
             self.comboPMUs.removeItem(index)
             
             del self.pmus_list[index]
+            del self.deque_dict_freq['PMU{0}freq'.format(index)] # Remove de deque object
         
             if total == 1: # if it is the last item, disable the button.
                 self.btnRemovePMU.setEnabled(False)
@@ -230,6 +242,18 @@ class MainWindow(QMainWindow):
         self.labelFreqValue.setText('{0:.5f} Hz'.format(frame.dataframe['freq']))
         for chName in self.selected_to_plotRT:
             print(frame.dataframe[chName])
+        self.deque_dict_freq['PMU{0}freq'.format(idx)].append(frame.dataframe['freq'])
+        self.deque_time.append(self.d_t)
+
+
+        if self.data_line0 == 0:
+            self.data_line0 = self.graph_freq.plot(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect="finite", pen=self.pen0)
+        else:
+            if (self.counter > 300):
+                self.graph_freq.setXRange(self.deque_time[0], self.deque_time[-1], padding=0)
+            self.data_line0.setData(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect='finite')  # Update the data.        
+        self.d_t += 0.03333
+        self.counter += 1
 
     def onTaskFinished(self,idx):
         print('{0} task finished.'.format(self.pmus_names[idx]))
@@ -275,6 +299,11 @@ class MainWindow(QMainWindow):
         icon.addPixmap(QtGui.QPixmap("images/broken-link.png"),QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.btnDisconnect.setIcon(icon)
         self.btnRemovePMU.setEnabled(True)
+        # Add deque object to real time plot:
+        self.deque_dict_freq['PMU{0}freq'.format(index)]=collections.deque(maxlen=300)
+        self.deque_time.clear()
+        self.d_t = 0
+        self.counter = 0
         self.treeWidgetPMU.itemChanged.connect(self.onTreeWidgetChange)
 
     def showTime(self):
