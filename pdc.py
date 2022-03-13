@@ -242,16 +242,16 @@ class MainWindow(QMainWindow):
         self.labelFreqValue.setText('{0:.5f} Hz'.format(frame.dataframe['freq']))
         for chName in self.selected_to_plotRT:
             print(frame.dataframe[chName])
+
         self.deque_dict_freq['PMU{0}freq'.format(idx)].append(frame.dataframe['freq'])
         self.deque_time.append(self.d_t)
-
 
         if self.data_line0 == 0:
             self.data_line0 = self.graph_freq.plot(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect="finite", pen=self.pen0)
         else:
             if (self.counter > 300):
                 self.graph_freq.setXRange(self.deque_time[0], self.deque_time[-1], padding=0)
-            self.data_line0.setData(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect='finite')  # Update the data.        
+            self.data_line0.setData(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect='finite', antialias=True)  # Update the data.        
         self.d_t += 0.03333
         self.counter += 1
 

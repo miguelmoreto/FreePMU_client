@@ -100,9 +100,19 @@ class PMUstation(QThread):
                     self.tcpSocket.send(buffer)
 
                     read_buffer = bytes(0)
-                    to_rcv = 804
-                    # Sometimes the socket read does not return all the required bytes.
-                    while (to_rcv > 0):
+                    # Read the first 4 bytes, in order to get the frame size.
+                    to_rcv = 4
+                    while (to_rcv > 0): # Sometimes the socket read does not return all the required bytes.
+                        read_tmp = self.tcpSocket.recv(to_rcv)
+                        to_rcv = to_rcv - len(read_tmp)
+                        read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
+                        #if to_rcv > 0:
+                        #    print('To receive {0} bytes a'.format(to_rcv))
+                    config_frame_size = (read_buffer[2] << 8) + read_buffer[3]
+                    # Read the remaing config frame:
+                    print(config_frame_size)
+                    to_rcv = config_frame_size - 4
+                    while (to_rcv > 0): # Sometimes the socket read does not return all the required bytes.
                         read_tmp = self.tcpSocket.recv(to_rcv)
                         to_rcv = to_rcv - len(read_tmp)
                         read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
@@ -111,20 +121,13 @@ class PMUstation(QThread):
 
                     if (read_buffer[0] == 170) and (read_buffer[1] == 50): # Check 0xAA32 (configuration frame 2):
                         self.num_pmu = (read_buffer[18] << 8) + read_buffer[19]
-                        #nom_freq = read_buffer[107] # TODO incorporate this in the loop of fields 8 to 19
-                        #if nom_freq == 0:
-                        #    self.nominal_freq = 60
-                        #else:
-                        #    self.nominal_freq = 50
                         # TODO read idcode, soc, fracsec, timebase
                         offset = 20
                         self.offsets = []
                         self.offsets.append(16)
                         for i in range(0, self.num_pmu):
                             name = str(read_buffer[(offset):(16+offset)], 'UTF-8').strip()
-                            #name = name.replace(' ','_')
                             self.pmu_names.append(name)
-                            #print(self.pmu_names)
                             self.pmu_phasor_names[name] = [] # Create dictionary key with the PMU name
                             self.pmu_phasor_cf[name] = []
                             self.num_phasors.append((read_buffer[20+offset] << 8) + read_buffer[21+offset])
@@ -132,7 +135,7 @@ class PMUstation(QThread):
                             self.num_digitals.append((read_buffer[24+offset] << 8) + read_buffer[25+offset])
                             offset = offset + 26 # offset for field 14
                             for j in range(0, self.num_phasors[i]): # field 14
-                                self.pmu_phasor_names[name].append(str(read_buffer[offset:(offset+16)]))
+                                self.pmu_phasor_names[name].append(str(read_buffer[offset:(offset+16)],'UTF-8').strip())
                                 #print(self.pmu_phasor_names[name])
                                 offset = offset + 16 # offset for field 15
                             # TODO read channel names for analog channels
@@ -147,10 +150,8 @@ class PMUstation(QThread):
                                 self.nominal_freq = 60
                             else:
                                 self.nominal_freq = 50
-
                             offset = offset + 4 # offset for the next fiel 8 or for the field 20+
-
-                            #offset = offset + 30 + self.num_phasors[i]*16 + self.num_phasors[i]*4  + self.num_analogs[i]*4 + self.num_digitals[i]*4
+                            # TODO update this in order to work if there as analog and/or digital channels
                             self.offsets.append(10+self.num_phasors[i]*8+self.offsets[i])                                                                        
                         
                         self.data_rate = (read_buffer[offset] << 8) + read_buffer[offset+1]
