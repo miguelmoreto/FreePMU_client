@@ -78,6 +78,12 @@ class PMUstation(QThread):
         self.phasor_format = 1    # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
         self.analog_format = 1   # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
         self.freq_format = 1     # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+        self.num_pmu = 0
+        self.num_phasors = []        # Number of phasors in each PMU device
+        self.num_analogs = []        # Number of analog channels in each PMU device
+        self.num_digitals = []       # Number of digital channels in each PMU device
+        self.pmu_names = []          # List with the names of all PMU devices
+        self.pmu_phasor_names = {}   # Dictionary containing a list of phasor names for each PMU device        
 
     def run(self):
         if self.command == 1: # Connect socket and read PMU configuration frame

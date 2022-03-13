@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
                 self.pmus_list[index].terminate()
             self.treeWidgetPMU.takeTopLevelItem(index)
             self.comboPMUs.removeItem(index)
-            
+            self.comboPMUs.setCurrentIndex(index-1)
             del self.pmus_list[index]
             del self.deque_dict_freq['PMU{0}freq'.format(index)] # Remove de deque object
         
@@ -192,6 +192,7 @@ class MainWindow(QMainWindow):
                 self.labelCurPMUname.setText('PMUx')
                 self.labelTimeStamp.setText('--/--/---- --:--')
                 self.labelFreqValue.setText('--.----- Hz')
+                self.comboPMUs.setCurrentIndex(0)
         
     """
     Add a PMU to the list with the paremeter set in the UI and 
@@ -236,6 +237,12 @@ class MainWindow(QMainWindow):
             self.btnDisconnect.setIcon(icon)
 
     def onTaskDataFrameReaded(self, frame, idx):
+        try:
+            # If the dict key does not exist, then this PMU has been removed, so does nothing.
+            self.deque_dict_freq['PMU{0}freq'.format(idx)].append(frame.dataframe['freq'])
+        except KeyError:
+            return
+
         tempstr = "{0}  {1:.4f}".format(time.strftime('%d/%m/%Y %H:%M:%S'),frame.fracsec)
         #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
         self.labelTimeStamp.setText(tempstr)
@@ -243,7 +250,7 @@ class MainWindow(QMainWindow):
         for chName in self.selected_to_plotRT:
             print(frame.dataframe[chName])
 
-        self.deque_dict_freq['PMU{0}freq'.format(idx)].append(frame.dataframe['freq'])
+        
         self.deque_time.append(self.d_t)
 
         if self.data_line0 == 0:
@@ -291,7 +298,7 @@ class MainWindow(QMainWindow):
                 subitem.setCheckState(1,False)
                 subitem.setCheckState(2,False)
         self.comboPMUs.addItem(self.pmus_names[index])
-        self.comboPMUs.setCurrentIndex(len(self.pmus_names)-1)
+        #self.comboPMUs.setCurrentIndex(len(self.pmus_names)-1)
         self.labelCurPMUname.setText(self.pmus_names[index])
         self.treeWidgetPMU.expandAll()
         self.btnDisconnect.setEnabled(True)
