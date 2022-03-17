@@ -41,9 +41,9 @@ class MainWindow(QMainWindow):
     selected_to_plotRT = [] # List of the selected channel names do plot in Real-time
 
     deque_dict_freq = {}    # Dictionary of deques to store the real time frequency values to plot.
-    deque_dict_mag = {}     # Dictionary of deques to store the real time magnitude values to plot.
-    deque_dict_angle = {}   # Dictionary of deques to store the real time angles values to plot.
-    data_lines_mag = {}     # Dictionary of pyqtgraph lineplots.
+    #deque_dict_mag = {}     # Dictionary of deques to store the real time magnitude values to plot.
+    #deque_dict_angle = {}   # Dictionary of deques to store the real time angles values to plot.
+    #data_lines_mag = {}     # Dictionary of pyqtgraph lineplots.
     deque_time = collections.deque()
 
     overflow = False
@@ -154,13 +154,13 @@ class MainWindow(QMainWindow):
             if (status == QtCore.Qt.Checked):
                 print('Channel {0} Plot status ON'.format(chName))
                 self.selected_to_plotRT.append(chName)
-                self.deque_dict_mag[str(parent.text(0))][chName] = collections.deque(maxlen=300)
-                self.data_lines_mag[str(parent.text(0))][chName] = []
+                #self.deque_dict_mag[str(parent.text(0))][chName] = collections.deque(maxlen=300)
+                #self.data_lines_mag[str(parent.text(0))][chName] = []
                 self.counter = 0
             else:
                 print('Channel {0} Plot status OFF'.format(chName))
-                del self.deque_dict_mag[str(parent.text(0))][chName]
-                del self.data_lines_mag[str(parent.text(0))][chName]
+                #del self.deque_dict_mag[str(parent.text(0))][chName]
+                #del self.data_lines_mag[str(parent.text(0))][chName]
                 self.selected_to_plotRT.remove(chName)
                 
         elif column == 2: # export checkbox changed
@@ -195,8 +195,8 @@ class MainWindow(QMainWindow):
             self.comboPMUs.setCurrentIndex(index-1)
             del self.pmus_list[index]
             del self.deque_dict_freq['PMU{0}freq'.format(index)] # Remove de deque object
-            del self.data_lines_mag['PMU{0}'.format(index)]
-            del self.deque_dict_mag['PMU{0}'.format(index)] 
+            #del self.data_lines_mag['PMU{0}'.format(index)]
+            #del self.deque_dict_mag['PMU{0}'.format(index)] 
         
             if total == 1: # if it is the last item, disable the button.
                 self.btnRemovePMU.setEnabled(False)
@@ -254,27 +254,29 @@ class MainWindow(QMainWindow):
         except KeyError:
             return
 
-        tempstr = "{0}  {1:.4f}".format(time.strftime('%d/%m/%Y %H:%M:%S'),frame.fracsec)
+        tempstr = "{0}.{1:04d}".format(time.strftime('%d/%m/%Y %H:%M:%S'),int(frame.fracsec*10000))
         #self.labelTimeStamp.setText(time.strftime('%d/%m/%Y %H:%M:%S.')+repr(fracsec))
         self.labelTimeStamp.setText(tempstr)
         self.labelFreqValue.setText('{0:.5f} Hz'.format(frame.dataframe['freq']))
         self.deque_time.append(self.d_t)
         for chName in self.selected_to_plotRT:
-            self.deque_dict_mag['PMU{0}'.format(idx)][chName].append(frame.dataframe[chName]['mag']) # Add data to the corresponding deque
-            if self.counter == 0:
-                self.data_lines_mag['PMU{0}'.format(idx)][chName] = self.graph_mag.plot(self.deque_time)
-            print(frame.dataframe[chName])
+            #self.deque_dict_mag['PMU{0}'.format(idx)][chName].append(frame.dataframe[chName]['mag']) # Add data to the corresponding deque
+            #if self.counter == 0:
+            #    self.data_lines_mag['PMU{0}'.format(idx)][chName] = self.graph_mag.plot(self.deque_time)
+            #print(frame.dataframe[chName])
+            pass
         # ideia... criar as deques na thread e inicializar com zero.
         # Aqui na UI, só criar instancias do plotitem ao selecionar.
         
-        
 
         if self.data_line0 == 0:
-            self.data_line0 = self.graph_freq.plot(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect="finite", pen=self.pen0)
+            #self.data_line0 = self.graph_freq.plot(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect="finite", pen=self.pen0)
+            self.data_line0 = self.graph_freq.plot(self.pmus_list[idx].plotdata_time, self.pmus_list[idx].plotdata_freq, connect="finite", pen=self.pen0)
+            
         else:
             if (self.counter > 300):
-                self.graph_freq.setXRange(self.deque_time[0], self.deque_time[-1], padding=0)
-            self.data_line0.setData(self.deque_time, self.deque_dict_freq['PMU{0}freq'.format(idx)], connect='finite', antialias=True)  # Update the data.        
+                self.graph_freq.setXRange(self.pmus_list[idx].plotdata_time[0], self.pmus_list[idx].plotdata_time[-1], padding=0)
+            self.data_line0.setData(self.pmus_list[idx].plotdata_time, self.pmus_list[idx].plotdata_freq, connect='finite', antialias=True)  # Update the data.        
         self.d_t += 0.03333
         self.counter += 1
 
@@ -324,8 +326,8 @@ class MainWindow(QMainWindow):
         self.btnRemovePMU.setEnabled(True)
         # Add deque object to real time plot:
         self.deque_dict_freq['PMU{0}freq'.format(index)]=collections.deque(maxlen=300)
-        self.deque_dict_mag['PMU{0}'.format(index)] = {} # A dict of dicts the will contains a deque for each channel to plot.
-        self.data_lines_mag['PMU{0}'.format(index)] = {}
+        #self.deque_dict_mag['PMU{0}'.format(index)] = {} # A dict of dicts the will contains a deque for each channel to plot.
+        #self.data_lines_mag['PMU{0}'.format(index)] = {}
         self.deque_time.clear()
         self.d_t = 0
         self.counter = 0

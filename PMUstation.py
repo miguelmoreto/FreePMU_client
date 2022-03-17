@@ -8,6 +8,7 @@ import datetime
 import socket
 from ctypes import *
 import math
+import collections
 
 """
 An object to contain the information of a single data frame.
@@ -40,6 +41,19 @@ class PMUstation(QThread):
     tcpport = 0
     ipaddr = ''
     tcpSocket = type(socket.socket())
+
+    # Data to real time plot. These dictionaries will contain a collections.deque 
+    # for each channel (channel name is de dict key):
+    plotdata_dict_mag = {}      # Magnitudes
+    plotdata_dict_angle = {}    # Phase angles
+    # Frequency, ROCOF and time have individual collections.deque:
+    plotdata_freq = collections.deque()
+    plotdata_rocof = collections.deque()
+    plotdata_time = collections.deque()
+    rt_data_ts = 0
+    rt_deque_len = 0
+    dt = 0
+
     status = 0          # Status code: 0 idle, 1 connected
     command = 0         # Command code:   0 does nothing,
                         #                 1 connect socket (send configuration frame)
@@ -49,7 +63,7 @@ class PMUstation(QThread):
 
     offsets = []
     frame_counter = 0
-    phasor_format = 1    # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
+    phasor_format = 1   # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
     analog_format = 1   # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
     freq_format = 1     # 1: floating point, each value is 4 bytes. 0: 2 bytes integer
     numBytesData = 0    # Number of bytes in the data frame
@@ -66,8 +80,18 @@ class PMUstation(QThread):
     onDataFrameReaded = pyqtSignal(PMUdataframe, int)   # Signal the readed dataframe and PMU list index.
     onMessage = pyqtSignal(int,int)                     # Signal message code and PMU list index.
 
-    def __init__(self, id, ipadr, tcpport, idx, parent = None):
-        
+    def __init__(self, id, ipadr, tcpport, idx, rt_data_ts = 10, parent = None):
+        """
+        Parameters:
+        id: ID code of the PMU
+        ipadr: ip address
+        tcpport: tcp port
+        idx: index of this PMU among the others readed by the program
+        rt_data_ts: time spam of the data to plot in real time (used to 
+                    calculate the number of data points according to the
+                    frame rate)
+
+        """
         QThread.__init__(self, parent)
         self.idCode = id
         self.tcpport = tcpport
@@ -83,7 +107,10 @@ class PMUstation(QThread):
         self.num_analogs = []        # Number of analog channels in each PMU device
         self.num_digitals = []       # Number of digital channels in each PMU device
         self.pmu_names = []          # List with the names of all PMU devices
-        self.pmu_phasor_names = {}   # Dictionary containing a list of phasor names for each PMU device        
+        self.pmu_phasor_names = {}   # Dictionary containing a list of phasor names for each PMU device
+        self.rt_data_ts = rt_data_ts
+        self.dt = 0
+
 
     def run(self):
         if self.command == 1: # Connect socket and read PMU configuration frame
@@ -105,15 +132,14 @@ class PMUstation(QThread):
                     buffer = b'\xAA\x42\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05'
                     self.tcpSocket.send(buffer)
 
+                    #********* Start reading and parsing the configuration frame buffer *************
                     read_buffer = bytes(0)
                     # Read the first 4 bytes, in order to get the frame size.
                     to_rcv = 4
                     while (to_rcv > 0): # Sometimes the socket read does not return all the required bytes.
                         read_tmp = self.tcpSocket.recv(to_rcv)
                         to_rcv = to_rcv - len(read_tmp)
-                        read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
-                        #if to_rcv > 0:
-                        #    print('To receive {0} bytes a'.format(to_rcv))
+                        read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.)
                     config_frame_size = (read_buffer[2] << 8) + read_buffer[3]
                     # Read the remaing config frame:
                     print(config_frame_size)
@@ -122,8 +148,6 @@ class PMUstation(QThread):
                         read_tmp = self.tcpSocket.recv(to_rcv)
                         to_rcv = to_rcv - len(read_tmp)
                         read_buffer = b"".join([read_buffer,read_tmp]) # Concatenate the bytes object.
-                        #if to_rcv > 0:
-                        #    print('To receive {0} bytes a'.format(to_rcv))
 
                     if (read_buffer[0] == 170) and (read_buffer[1] == 50): # Check 0xAA32 (configuration frame 2):
                         self.num_pmu = (read_buffer[18] << 8) + read_buffer[19]
@@ -156,11 +180,22 @@ class PMUstation(QThread):
                                 self.nominal_freq = 60
                             else:
                                 self.nominal_freq = 50
-                            offset = offset + 4 # offset for the next fiel 8 or for the field 20+
+                            offset = offset + 4 # offset for the next field 8 or for the field 20+
                             # TODO update this in order to work if there as analog and/or digital channels
                             self.offsets.append(10+self.num_phasors[i]*8+self.offsets[i])                                                                        
                         
                         self.data_rate = (read_buffer[offset] << 8) + read_buffer[offset+1]
+                        # ******** configuration frame parsing done **********
+                        self.rt_deque_len = int(self.data_rate * self.rt_data_ts)
+                        self.plotdata_freq = collections.deque(maxlen=self.rt_deque_len)
+                        self.plotdata_rocof = collections.deque(maxlen=self.rt_deque_len)
+                        self.plotdata_time = collections.deque(maxlen=self.rt_deque_len)
+                        # Creating a deque for each channel:
+                        for j in range(0, self.num_pmu):
+                            for i in range(0, self.num_phasors[j]):
+                                self.plotdata_dict_mag[self.pmu_phasor_names[self.pmu_names[j]][i]] = collections.deque(maxlen=self.rt_deque_len)
+                                self.plotdata_dict_angle[self.pmu_phasor_names[self.pmu_names[j]][i]] = collections.deque(maxlen=self.rt_deque_len)
+
                         self.onConfigFrameReaded.emit(self.index) # Signal UI
                         self.calculateDataFrameSize()
                         print('PMU {0} data frame has {1} bytes.'.format(self.index,self.numBytesData))
@@ -228,6 +263,8 @@ class PMUstation(QThread):
                     self.frame.dataframe['freq'] = self.freq
                     self.frame.fracsec = self.fracsec_f
                     self.frame.timestamp = self.date_time
+                    self.plotdata_freq.append(self.freq)    # Update real time plotting data
+                    self.plotdata_time.append(self.dt)
                     k = 0
                     for j in range(0, self.num_pmu):
                         k = self.offsets[j]
@@ -236,15 +273,18 @@ class PMUstation(QThread):
                             phasor_tmp = (read_buffer[k] << 24) + (read_buffer[k+1] << 16) + (read_buffer[k+2] << 8) + read_buffer[k+3]
                             cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                             fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
+                            self.plotdata_dict_mag[self.pmu_phasor_names[self.pmu_names[j]][i]].append(fp.contents.value)
                             self.frame.dataframe[self.pmu_phasor_names[self.pmu_names[j]][i]] = {'mag':fp.contents.value}
                             # Read phasor
                             phasor_tmp = (read_buffer[k+4] << 24) + (read_buffer[k+5] << 16) + (read_buffer[k+6] << 8) + read_buffer[k+7]
                             cp = pointer(c_int(phasor_tmp))           # make this into a c integer
                             fp = cast(cp, POINTER(c_float))  # cast the int pointer to a float pointer
+                            self.plotdata_dict_angle[self.pmu_phasor_names[self.pmu_names[j]][i]].append((fp.contents.value * 180.0) / math.pi)
                             self.frame.dataframe[self.pmu_phasor_names[self.pmu_names[j]][i]].update({'ang':(fp.contents.value * 180.0) / math.pi})                                                                              
                             k += 8
                     self.frame_counter += 1
                     self.onDataFrameReaded.emit(self.frame,self.index)
+                self.dt += 1/self.data_rate
             i = i + 1
             if (self.command == 2):
                 # Signal the PMU to stop sending data frames:
